@@ -10,3 +10,4 @@ faiss-cpu
 ollama
 streamlit
 docling
+langchain-groq

@@ -1,19 +1,44 @@
+import os
 from langchain_community.llms import Ollama
+from langchain_groq import ChatGroq
 from langchain_classic.chains import RetrievalQA
 from langchain_core.prompts import PromptTemplate
 from .vectorstore import LASCVectorStore
-import os
 
 class LASCAgent:
-    def __init__(self, model_name="llama3.2"):
-        self.model_name = model_name
+    def __init__(self, provider="ollama", model_name=None, api_key=None, base_url=None):
+        """
+        Initialize the LASCAgent with a specific provider.
+        provider: 'ollama' or 'groq'
+        model_name: specific model to use (default based on provider)
+        api_key: required for 'groq'
+        base_url: custom URL for ollama (useful for network/tunnel)
+        """
+        self.provider = provider
         self.vs_manager = LASCVectorStore()
         self.vectorstore = self.vs_manager.load_index()
+        
+        # Determine model name if not provided
+        if not model_name:
+            self.model_name = "llama3.2" if provider == "ollama" else "llama3-70b-8192"
+        else:
+            self.model_name = model_name
 
-        # Setup the local LLM via Ollama
-        self.llm = Ollama(model=model_name, base_url="http://localhost:11434")
+        # Setup the LLM based on provider
+        if provider == "ollama":
+            url = base_url if base_url else "http://localhost:11434"
+            self.llm = Ollama(model=self.model_name, base_url=url)
+        elif provider == "groq":
+            if not api_key:
+                raise ValueError("API Key é obrigatória para o modo Online (Groq).")
+            self.llm = ChatGroq(
+                model_name=self.model_name,
+                groq_api_key=api_key
+            )
+        else:
+            raise ValueError(f"Provedor {provider} não suportado.")
 
-        # Strict bilingual prompt — instructs the model to use context only
+        # Strict bilingual prompt
         template = """Você é um assistente técnico especializado no LASC (Latin American Space Challenge).
 Baseie suas respostas EXCLUSIVAMENTE nos documentos fornecidos no contexto abaixo.
 
@@ -53,13 +78,11 @@ Resposta Técnica Detalhada (use tabelas se possível):"""
             total_pages = meta.get('total_pages')
             doc_type = meta.get('type', '')
 
-            # Build a unique key to avoid duplicate citations
             key = f"{source_url}#{page}#{section}"
             if key in seen:
                 continue
             seen.add(key)
 
-            # Build citation string
             citation = ""
             if doc_name:
                 citation += f"📄 {doc_name}"
@@ -74,7 +97,6 @@ Resposta Técnica Detalhada (use tabelas se possível):"""
 
             if section:
                 citation += f"\n   └─ Seção: \"{section}\""
-
             if doc_name:
                 citation += f"\n   └─ URL: {source_url}"
 
@@ -89,7 +111,6 @@ Resposta Técnica Detalhada (use tabelas se possível):"""
                 "sources": []
             }
 
-        # Bilingual query expansion to improve retrieval
         expanded_query = (
             f"{query} "
             f"(technical data, numerical requirements, limits, mass, weight, dimensions, mm, kg, m, "
@@ -106,7 +127,7 @@ Resposta Técnica Detalhada (use tabelas se possível):"""
         )
 
         try:
-            print(f"\n🔍 Buscando: {query}...")
+            print(f"\n🔍 Buscando [{self.provider}]: {query}...")
             result = qa_chain.invoke({"query": expanded_query})
             
             response = result["result"]
@@ -119,12 +140,18 @@ Resposta Técnica Detalhada (use tabelas se possível):"""
                 "raw_sources": source_docs
             }
         except Exception as e:
-            if "memory" in str(e).lower() or "500" in str(e):
+            error_str = str(e).lower()
+            if "memory" in error_str or "500" in error_str:
                 return {
-                    "answer": f"❌ Erro de Memória: O modelo '{self.model_name}' falhou. Seu sistema possui apenas 1.3GB de RAM disponíveis, o que é insuficiente para rodar o 'llama3'.\n\nPor favor, tente um modelo mais leve como 'phi3' ou 'gemma:2b'.\n\n**Ação sugerida:** Execute `ollama pull phi3` e reinicie a aplicação.",
+                    "answer": f"❌ Erro de Memória no {self.provider}: O modelo falhou. Se estiver usando Ollama, tente o 'llama3.2' (2GB) ou use o modo Gratuito Online (Groq).",
                     "sources": []
                 }
-            raise e
+            return {
+                "answer": f"❌ Erro na conexão com o motor de IA ({self.provider}): {e}",
+                "sources": []
+            }
 
 if __name__ == "__main__":
-    agent = LASCAgent()
+    # Test local
+    agent = LASCAgent(provider="ollama")
+    print("Agente local inicializado.")

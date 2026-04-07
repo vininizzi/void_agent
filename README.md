@@ -55,27 +55,42 @@ python main.py --chat
 
 ---
 
-## 🛠️ Instalação e Uso Automático
+## 🌍 Deploy e Versatilidade (Modo Híbrido)
 
-1.  **Ativar o Ambiente**:
-    ```bash
-    conda activate VOID
-    ```
-2.  **Instalar Dependências**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-3.  **Certificar o Ollama**:
-    Certifique-se de que o **Ollama** está rodando (`ollama serve`) e o modelo baixado:
-    ```bash
-    ollama pull llama3
-    ```
-4.  **Iniciar a Interface Web**:
-    ```bash
-    python main.py --web
-    ```
+O Void Agent foi projetado para ser flexível. Você pode rodá-lo localmente ou em nuvem (ex: Streamlit Cloud).
+
+### Opção A: IA Local (Ollama)
+Ideal para privacidade e uso de hardware próprio.
+
+#### 1. Configuração de Rede e CORS (Obrigatório)
+Para que o site (na nuvem) consiga "conversar" com o seu PC (local), você deve permitir conexões externas:
+- **Linux/Mac**:
+  ```bash
+  OLLAMA_ORIGINS="*" ollama serve
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  $env:OLLAMA_ORIGINS="*"; ollama serve
+  ```
+
+#### 2. Criando o Túnel com Ngrok (Acesso Externo)
+Se o seu site estiver hospedado no Streamlit Cloud, ele não consegue ver o seu `localhost`. Use o **Ngrok** para criar um link público:
+1. Instale o [Ngrok](https://ngrok.com/).
+2. Com o Ollama rodando, execute:
+   ```bash
+   ngrok http 11434 --host-header="localhost:11434"
+   ```
+3. O Ngrok gerará um link (ex: `https://abcd-123.ngrok-free.app`).
+4. **No Site**: Copie esse link e cole no campo "Endereço do Ollama" na barra lateral do Void Agent.
+
+### Opção B: IA na Nuvem (Groq - Grátis)
+Ideal para deploy rápido sem hardware local.
+- **Vantagem**: Não exige túneis ou configurações de rede complexas.
+- **Como usar**:
+  1. Obtenha uma API Key gratuita em [console.groq.com](https://console.groq.com).
+  2. Selecione o modo "Groq Cloud" na barra lateral e cole sua chave.
+- **Modelos**: `llama3-70b-8192` (Extremamente rápido e preciso).
 
 ---
-*Desenvolvido com ❤️ por Antigravity AI*
 # void_agent
 # void_agent

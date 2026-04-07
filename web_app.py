@@ -7,7 +7,7 @@ from src.pipeline import LASCPipeline
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Void Agent - LASC Expert",
-    page_icon="🌌",
+    page_icon="🛰️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -15,26 +15,9 @@ st.set_page_config(
 # --- Custom Styling ---
 st.markdown("""
     <style>
-    .main {
-        background-color: #0e1117;
-    }
-    .stChatMessage {
-        border-radius: 10px;
-        padding: 10px;
-        margin-bottom: 10px;
-    }
-    .source-box {
-        background-color: #1e2130;
-        border-left: 5px solid #4a90e2;
-        padding: 10px;
-        border-radius: 5px;
-        font-size: 0.9em;
-        margin-top: 5px;
-    }
-    .citation-title {
-        color: #4a90e2;
-        font-weight: bold;
-    }
+    .stChatMessage { border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+    .stAlert { border-radius: 10px; }
+    .sidebar-section { background-color: #1e2130; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -48,70 +31,93 @@ with st.sidebar:
     st.caption("Especialista em Regras e Editais LASC")
     st.divider()
     
-    st.subheader("⚙️ Configurações de Modelo")
-    st.warning("⚠️ Seu sistema possui **1.3GB de RAM** livres. O modelo **llama3.2** (2.0GB) é o que mais se aproxima da sua capacidade disponível.")
-    
-    # Updated to strictly use models the user confirmed having
-    user_models = ["llama3.2", "qwen3.5", "qwen2.5", "llama3", "codellama:7b"]
-    model_option = st.selectbox(
-        "Modelo Ollama Local", 
-        user_models, 
+    st.subheader("🤖 Configuração do Motor de IA")
+    ai_mode = st.radio(
+        "Selecione o modo de processamento:",
+        ["Ollama (Local/Híbrido)", "Groq Cloud (Online Grátis)"],
         index=0,
-        help="Llama 3.2 (2GB) é o modelo mais leve da sua lista."
+        help="O modo Ollama usa o seu computador. O modo Groq usa a nuvem."
     )
     
-    if st.button("🔄 Reinicializar / Trocar Modelo"):
-        with st.spinner(f"Carregando {model_option}..."):
-            st.session_state.agent = LASCAgent(model_name=model_option)
-            st.toast(f"Modelo {model_option} carregado!")
-            time.sleep(1)
-            st.rerun()
+    # --- Ollama Config ---
+    if ai_mode == "Ollama (Local/Híbrido)":
+        ollama_url = st.text_input("Endereço do Ollama", value="http://localhost:11434")
+        
+        user_models = ["llama3.2", "qwen3.5", "qwen2.5", "llama3", "codellama:7b"]
+        model_option = st.selectbox("Modelo Local", user_models, index=0)
+        
+        with st.expander("ℹ️ Como configurar p/ rede"):
+            st.markdown("""
+            Para usar o Ollama do seu PC no site (CORS):
+            1. No terminal do seu PC, rode:
+               `OLLAMA_ORIGINS="*" ollama serve`
+            2. Se estiver fora de casa, use um IP público ou túnel (como ngrok).
+            """)
+        
+        if st.button("🔌 Conectar Ollama"):
+            with st.spinner("Conectando..."):
+                st.session_state.agent = LASCAgent(
+                    provider="ollama", 
+                    model_name=model_option, 
+                    base_url=ollama_url
+                )
+                st.toast("Conectado ao Ollama!")
+                st.rerun()
+
+    # --- Groq Config ---
+    else:
+        groq_key = st.text_input("Groq API Key", type="password", help="Obtenha grátis em console.groq.com")
+        st.markdown("[🔗 Pegar chave gratuita no Groq](https://console.groq.com/keys)")
+        
+        groq_models = ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
+        model_option = st.selectbox("Modelo Nuvem", groq_models, index=0)
+
+        if st.button("☁️ Conectar Groq"):
+            if not groq_key:
+                st.error("Por favor, insira a API Key do Groq.")
+            else:
+                with st.spinner("Inicializando motor Cloud..."):
+                    st.session_state.agent = LASCAgent(
+                        provider="groq", 
+                        model_name=model_option, 
+                        api_key=groq_key
+                    )
+                    st.toast("Motor Groq Cloud Ativo!")
+                    st.rerun()
 
     st.divider()
     st.subheader("📊 Status da Base")
     if os.path.exists("data/vectorstore"):
-        st.success("✅ Base Vetorial pronta")
+        st.success("✅ Documentos Indexados")
     else:
-        st.error("❌ Base Vetorial não encontrada")
+        st.error("❌ Documentos não encontrados")
     
     st.divider()
-    st.subheader("🛠️ Sincronização Única")
-    st.write("Clique abaixo para baixar, processar e indexar todos os dados em um único fluxo.")
-    
+    st.subheader("🛠️ Sincronização de Dados")
     if st.button("🚀 Iniciar Coleta Completa"):
-        with st.status("⏳ Executando Pipeline Unificado...", expanded=True) as status:
+        with st.status("⏳ Executando Sincronização...", expanded=True) as status:
             try:
                 pipeline = LASCPipeline()
-                # Run the unified pipeline with status updates
                 pipeline.run_full_sync(
                     max_pages=20, 
                     status_callback=lambda msg: status.update(label=msg, state="running")
                 )
-                
-                status.update(label="✅ Sincronização finalizada com sucesso!", state="complete", expanded=False)
-                
-                # Reload agent to use new index
-                st.session_state.agent = LASCAgent(model_name=model_option)
+                status.update(label="✅ Sincronização finalizada!", state="complete", expanded=False)
                 st.toast("Base de dados atualizada!", icon="🎉")
                 time.sleep(1)
                 st.rerun()
-                
             except Exception as e:
-                status.update(label=f"❌ Erro no Pipeline: {e}", state="error")
+                status.update(label=f"❌ Erro: {e}", state="error")
                 st.error(f"Erro: {e}")
 
-# --- Agent Initialization (Late init after potential sidebar changes) ---
+# --- Agent Initialization ---
 if "agent" not in st.session_state:
-    with st.spinner("🚀 Inicializando Agente LASC..."):
-        try:
-            st.session_state.agent = LASCAgent(model_name=model_option)
-        except Exception as e:
-            st.error(f"Erro: {e}. Certifique-se de que o Ollama está rodando e execute: `ollama pull {model_option}`")
-            st.stop()
+    st.info("👋 Por favor, configure o motor de IA na barra lateral para começar.")
+    st.stop()
 
 # --- Main Interface ---
 st.title("🛰️ LASC RAG Assistant")
-st.markdown("Bem-vindo ao assistente do **Latin American Space Challenge**. Como posso ajudar sua equipe hoje?")
+st.markdown("Bem-vindo ao assistente do **Latin American Space Challenge**. Peça detalhes técnicos, regras ou pontuações.")
 
 # Display chat history
 for message in st.session_state.messages:
@@ -123,24 +129,20 @@ for message in st.session_state.messages:
                     st.markdown(f"**[{idx}]** {source.replace('📄', '📄 **').replace('—', '** —')}")
 
 # Chat input
-if prompt := st.chat_input("Pergunte algo (ex: 'Quais os critérios de inovação?')"):
-    # Add user message
+if prompt := st.chat_input("Pergunte algo técnico (ex: 'requisitos de massa do Cansat')"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generate assistant response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         message_placeholder.markdown("🔍 *Consultando base de documentos...*")
         
         try:
-            # Query the agent
             result = st.session_state.agent.ask(prompt)
             full_response = result["answer"]
             sources = result["sources"]
             
-            # Display response
             message_placeholder.markdown(full_response)
             
             if sources:
@@ -148,7 +150,6 @@ if prompt := st.chat_input("Pergunte algo (ex: 'Quais os critérios de inovaçã
                     for idx, source in enumerate(sources, 1):
                          st.markdown(f"**[{idx}]** {source.replace('📄', '📄 **').replace('—', '** —')}")
             
-            # Save assistant message
             st.session_state.messages.append({
                 "role": "assistant", 
                 "content": full_response,
@@ -156,5 +157,5 @@ if prompt := st.chat_input("Pergunte algo (ex: 'Quais os critérios de inovaçã
             })
             
         except Exception as e:
-            st.error(f"Algo deu errado: {e}")
+            st.error(f"Erro no processamento: {e}")
             st.session_state.messages.append({"role": "assistant", "content": f"Erro: {e}"})
