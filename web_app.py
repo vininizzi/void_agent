@@ -43,6 +43,10 @@ with st.sidebar:
     if ai_mode == "Ollama (Local/Híbrido)":
         ollama_url = st.text_input("Endereço do Ollama", value="http://localhost:11434")
         
+        # Deployment Warning for Localhost
+        if "localhost" in ollama_url and "streamlit.app" in st.get_option("browser.serverAddress"):
+            st.warning("⚠️ **Dica de Deploy**: Você está na nuvem tentando acessar 'localhost'. Mude o endereço acima para o seu link do **Ngrok**.")
+
         user_models = ["llama3.2", "qwen3.5", "qwen2.5", "llama3", "codellama:7b"]
         model_option = st.selectbox("Modelo Local", user_models, index=0)
         
@@ -56,20 +60,23 @@ with st.sidebar:
         
         if st.button("🔌 Conectar Ollama"):
             with st.spinner("Conectando..."):
-                st.session_state.agent = LASCAgent(
-                    provider="ollama", 
-                    model_name=model_option, 
-                    base_url=ollama_url
-                )
-                st.toast("Conectado ao Ollama!")
-                st.rerun()
+                try:
+                    st.session_state.agent = LASCAgent(
+                        provider="ollama", 
+                        model_name=model_option, 
+                        base_url=ollama_url
+                    )
+                    st.toast("Conectado ao Ollama!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Falha de Conexão: Certifique-se de que o Ollama está rodando e o OLLAMA_ORIGINS está configurado.")
 
     # --- Groq Config ---
     else:
         groq_key = st.text_input("Groq API Key", type="password", help="Obtenha grátis em console.groq.com")
         st.markdown("[🔗 Pegar chave gratuita no Groq](https://console.groq.com/keys)")
         
-        groq_models = ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
+        groq_models = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
         model_option = st.selectbox("Modelo Nuvem", groq_models, index=0)
 
         if st.button("☁️ Conectar Groq"):

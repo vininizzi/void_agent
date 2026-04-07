@@ -20,7 +20,7 @@ class LASCAgent:
         
         # Determine model name if not provided
         if not model_name:
-            self.model_name = "llama3.2" if provider == "ollama" else "llama3-70b-8192"
+            self.model_name = "llama3.2" if provider == "ollama" else "llama-3.3-70b-versatile"
         else:
             self.model_name = model_name
 
