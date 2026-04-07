@@ -41,7 +41,7 @@ with st.sidebar:
     
     # --- Ollama Config ---
     if ai_mode == "Ollama (Local/Híbrido)":
-        ollama_url = st.text_input("Endereço do Ollama", value="http://localhost:11434")
+        ollama_url = st.text_input("Endereço do Ollama", value="http://localhost:11434").strip()
         
         # Deployment Warning for Localhost
         if "localhost" in ollama_url and "streamlit.app" in st.get_option("browser.serverAddress"):
